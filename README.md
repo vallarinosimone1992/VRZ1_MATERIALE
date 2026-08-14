@@ -22,6 +22,18 @@ La matrice completa dei permessi e la struttura organizzativa sono documentate i
 - GitHub Pages per il frontend
 - GitHub Actions per il deploy
 
+## Stato Supabase
+
+Il progetto Supabase di produzione è già stato creato e inizializzato. Le migration in `supabase/migrations/` rappresentano lo schema versionato e devono restare la fonte di verità per le modifiche future al database.
+
+Sono già configurati:
+
+- schema iniziale e struttura organizzativa;
+- RLS e matrice dei permessi;
+- funzione atomica `apply_stock_movement` per **Consuma/Aggiungi**;
+- audit log e storico movimenti;
+- bootstrap del primo account Admin.
+
 ## Avvio locale
 
 Richiede Node.js recente.
@@ -35,23 +47,31 @@ npm run dev
 In `.env.local` vanno impostati:
 
 ```text
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_PUBLISHABLE_KEY=...
+VITE_SUPABASE_URL=https://qofktbuzwnfcstnzjfit.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable key del progetto>
 ```
 
-La chiave `service_role` **non deve mai essere inserita nel frontend o nei secret Vite**.
+`.env.local` è ignorato da Git e non deve essere committato.
+
+La chiave `service_role` **non deve mai essere inserita nel frontend, nella repository o nei secret Vite**.
+
+## Primo test locale
+
+1. clonare la repository e passare alla branch di sviluppo;
+2. creare `.env.local` dai valori indicati sopra;
+3. eseguire `npm install`;
+4. eseguire `npm run dev`;
+5. aprire l'URL locale mostrato da Vite;
+6. accedere con l'account Admin creato in Supabase Auth;
+7. verificare che venga mostrato il profilo `ADMIN` e che la ricerca dell'inventario si carichi senza errori.
+
+Finché non sono presenti oggetti, la schermata mostrerà correttamente `Nessun materiale trovato`.
 
 ## Database Supabase
 
-Le migration sono in `supabase/migrations/`.
+Le migration sono in `supabase/migrations/` e sono già state applicate al progetto corrente.
 
-Per la prima configurazione:
-
-1. creare un progetto Supabase;
-2. applicare in ordine le migration SQL;
-3. creare il primo utente in Supabase Auth;
-4. inserire il relativo profilo con ruolo `admin` come indicato in fondo alla migration `001_initial_schema.sql`;
-5. copiare Project URL e Publishable Key in `.env.local`.
+Per installare lo stesso schema su un eventuale nuovo progetto Supabase, applicare le migration in ordine numerico e poi creare il primo utente Admin in Auth e il corrispondente record in `public.profiles`.
 
 Gli account successivi saranno gestiti dall'admin dell'app. La creazione sicura degli utenti Auth richiederà una funzione server-side/Edge Function, che verrà aggiunta senza esporre credenziali privilegiate al browser.
 
@@ -59,12 +79,18 @@ Gli account successivi saranno gestiti dall'admin dell'app. La creazione sicura 
 
 Il workflow `.github/workflows/deploy-pages.yml` pubblica `main` su GitHub Pages.
 
-Prima del deploy configurare nella repository i secret:
+Prima del deploy configurare nella repository GitHub, in **Settings → Secrets and variables → Actions**, questi repository secrets:
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_URL` = `https://qofktbuzwnfcstnzjfit.supabase.co`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` = publishable key del progetto Supabase
 
-E abilitare GitHub Pages con **GitHub Actions** come sorgente.
+Poi, dopo che la repository sarà pubblica:
+
+1. aprire **Settings → Pages**;
+2. impostare **Source: GitHub Actions**;
+3. fare merge della branch di sviluppo in `main`;
+4. controllare il workflow nella scheda **Actions**;
+5. aprire l'URL GitHub Pages prodotto dal deploy.
 
 ## Stato attuale
 
