@@ -2,37 +2,26 @@
 
 Webapp per la gestione e la ricerca del materiale disponibile nelle sedi scout di Ragioneria.
 
-## Funzioni previste
+## Funzioni v1
 
 - ricerca testuale del materiale;
 - classificazione per branca, unità e, per E/G, squadriglia;
-- stanza e posizione fisica opzionale;
-- quantità gestita con operazioni **Consuma** e **Aggiungi**;
+- collocazione fisica strutturata `Sede → Stanza → Posizione → Sottoposizione`;
+- quantità gestita esclusivamente tramite **Consuma** e **Aggiungi**;
 - note permanenti e note operative;
-- storico dei movimenti di quantità;
-- audit delle modifiche;
-- autenticazione e permessi differenziati per Admin, Capi, R/S ed E/G.
+- scheda dettagliata dell'oggetto;
+- storico dei movimenti di quantità e audit delle modifiche;
+- autenticazione e permessi differenziati per Admin, Capi, R/S ed E/G;
+- pannello Admin per materiale, luoghi e utenti.
 
 La matrice completa dei permessi e la struttura organizzativa sono documentate in [`docs/permissions.md`](docs/permissions.md).
 
 ## Stack
 
 - React + TypeScript + Vite
-- Supabase: PostgreSQL, Auth e Row Level Security
+- Supabase: PostgreSQL, Auth, Row Level Security ed Edge Functions
 - GitHub Pages per il frontend
-- GitHub Actions per il deploy
-
-## Stato Supabase
-
-Il progetto Supabase di produzione è già stato creato e inizializzato. Le migration in `supabase/migrations/` rappresentano lo schema versionato e devono restare la fonte di verità per le modifiche future al database.
-
-Sono già configurati:
-
-- schema iniziale e struttura organizzativa;
-- RLS e matrice dei permessi;
-- funzione atomica `apply_stock_movement` per **Consuma/Aggiungi**;
-- audit log e storico movimenti;
-- bootstrap del primo account Admin.
+- GitHub Actions per CI e deploy
 
 ## Avvio locale
 
@@ -44,63 +33,93 @@ cp .env.example .env.local
 npm run dev
 ```
 
-In `.env.local` vanno impostati:
+In `.env.local`:
 
 ```text
 VITE_SUPABASE_URL=https://qofktbuzwnfcstnzjfit.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable key del progetto>
 ```
 
-`.env.local` è ignorato da Git e non deve essere committato.
+`.env.local` è ignorato da Git. La chiave `service_role` **non deve mai essere inserita nel frontend o nella repository**.
 
-La chiave `service_role` **non deve mai essere inserita nel frontend, nella repository o nei secret Vite**.
+Per rendere il server Vite raggiungibile dal telefono sulla stessa rete:
 
-## Primo test locale
+```bash
+npm run dev -- --host
+```
 
-1. clonare la repository e passare alla branch di sviluppo;
-2. creare `.env.local` dai valori indicati sopra;
-3. eseguire `npm install`;
-4. eseguire `npm run dev`;
-5. aprire l'URL locale mostrato da Vite;
-6. accedere con l'account Admin creato in Supabase Auth;
-7. verificare che venga mostrato il profilo `ADMIN` e che la ricerca dell'inventario si carichi senza errori.
+## Database e backend Supabase
 
-Finché non sono presenti oggetti, la schermata mostrerà correttamente `Nessun materiale trovato`.
+Le migration versionate sono in `supabase/migrations/` e sono già applicate al progetto corrente.
 
-## Database Supabase
+Il backend comprende:
 
-Le migration sono in `supabase/migrations/` e sono già state applicate al progetto corrente.
+- struttura organizzativa Branche/Unità/Squadriglie;
+- sedi `Ragioneria` e `Diga` con le stanze iniziali;
+- posizioni fisiche gerarchiche configurabili dall'Admin;
+- RLS per VIEW/USE/EDIT/MANAGE;
+- funzione atomica `apply_stock_movement`;
+- `stock_movements` e `audit_log`;
+- Edge Function `admin-users` per creare nuovi account senza esporre credenziali privilegiate.
 
-Per installare lo stesso schema su un eventuale nuovo progetto Supabase, applicare le migration in ordine numerico e poi creare il primo utente Admin in Auth e il corrispondente record in `public.profiles`.
+La sorgente della Edge Function è in `supabase/functions/admin-users/`.
 
-Gli account successivi saranno gestiti dall'admin dell'app. La creazione sicura degli utenti Auth richiederà una funzione server-side/Edge Function, che verrà aggiunta senza esporre credenziali privilegiate al browser.
+## Pannello Admin
+
+L'account con ruolo `admin` vede la voce **Amministrazione** con tre aree.
+
+### Materiale
+
+- `+ Nuovo materiale`;
+- modifica di anagrafica, appartenenza e collocazione;
+- quantità iniziale impostabile solo alla creazione;
+- quantità successive modificate con Consuma/Aggiungi.
+
+### Sedi e posizioni
+
+- aggiunta/rinomina sedi;
+- aggiunta/rinomina stanze;
+- aggiunta/rinomina posizioni e sottoposizioni gerarchiche.
+
+### Utenti
+
+- creazione account con password temporanea;
+- assegnazione ruolo;
+- associazione a unità/squadriglia;
+- attivazione/disattivazione profilo.
+
+## Test v1 consigliato
+
+Prima del deploy pubblico:
+
+1. aggiungere 20–30 oggetti reali tramite il pannello Admin;
+2. distribuire gli oggetti fra Comune, R/S, E/G e alcune squadriglie;
+3. creare almeno un utente di prova per ruolo;
+4. verificare VIEW/USE/EDIT con ciascun ruolo;
+5. fare Consuma/Aggiungi su materiale consumabile e non consumabile;
+6. aggiungere note operative;
+7. spostare alcuni oggetti tra stanze/posizioni e verificare la cronologia;
+8. provare da desktop e smartphone.
+
+Non inseriremo automaticamente materiale fittizio nel database di produzione: il test va fatto con oggetti effettivamente presenti nelle sedi.
+
+## CI
+
+`.github/workflows/ci.yml` esegue `npm install` e `npm run build` a ogni push sulle branch diverse da `main` e sulle pull request verso `main`.
 
 ## Deploy GitHub Pages
 
 Il workflow `.github/workflows/deploy-pages.yml` pubblica `main` su GitHub Pages.
 
-Prima del deploy configurare nella repository GitHub, in **Settings → Secrets and variables → Actions**, questi repository secrets:
+Prima del deploy configurare in **Settings → Secrets and variables → Actions**:
 
 - `VITE_SUPABASE_URL` = `https://qofktbuzwnfcstnzjfit.supabase.co`
 - `VITE_SUPABASE_PUBLISHABLE_KEY` = publishable key del progetto Supabase
 
-Poi, dopo che la repository sarà pubblica:
+Quando saremo pronti:
 
-1. aprire **Settings → Pages**;
-2. impostare **Source: GitHub Actions**;
-3. fare merge della branch di sviluppo in `main`;
-4. controllare il workflow nella scheda **Actions**;
-5. aprire l'URL GitHub Pages prodotto dal deploy.
-
-## Stato attuale
-
-La base della v1 comprende:
-
-- login email/password;
-- caricamento del profilo e del ruolo;
-- ricerca degli oggetti consentiti dal ruolo;
-- visualizzazione di quantità, branca/unità/squadriglia, stanza e posizione;
-- pulsanti `Consuma` e `Aggiungi` dove l'utente dispone del permesso USE;
-- schema SQL con RLS, log e struttura organizzativa precompilata.
-
-Da implementare nelle prossime iterazioni: scheda dettagliata dell'oggetto, UI per note e cronologia, editor per Capi/R/S, pannello Admin, gestione account e rifinitura UX.
+1. rendere pubblica la repository;
+2. **Settings → Pages → Source: GitHub Actions**;
+3. merge della branch di sviluppo in `main`;
+4. controllo del workflow in **Actions**;
+5. apertura dell'URL GitHub Pages prodotto dal deploy.
