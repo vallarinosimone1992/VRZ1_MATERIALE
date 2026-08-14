@@ -35,18 +35,31 @@ export async function loadReferenceData() {
   }
 }
 
-export async function loadItems(search = '') {
-  let request = supabase.from('items').select(ITEM_SELECT).order('name').limit(500)
-  const cleaned = search.trim().replaceAll(',', ' ')
-  if (cleaned) {
-    const pattern = `%${cleaned}%`
-    request = request.or(
-      `name.ilike.${pattern},description.ilike.${pattern},category.ilike.${pattern},location.ilike.${pattern},notes.ilike.${pattern}`,
-    )
-  }
-  const { data, error } = await request
+export async function loadItems() {
+  const { data, error } = await supabase.from('items').select(ITEM_SELECT).order('name').limit(2000)
   if (error) throw error
   return (data ?? []) as unknown as Item[]
+}
+
+export function filterItems(items: Item[], search: string, locations: StorageLocation[]) {
+  const needle = search.trim().toLocaleLowerCase('it-IT')
+  if (!needle) return items
+  return items.filter((item) => {
+    const haystack = [
+      item.name,
+      item.description,
+      item.category,
+      item.notes,
+      item.branch?.label,
+      item.unit?.label,
+      item.squad?.label,
+      formatPhysicalLocation(item, locations),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase('it-IT')
+    return haystack.includes(needle)
+  })
 }
 
 export function canUseItem(profile: Profile, item: Item) {
