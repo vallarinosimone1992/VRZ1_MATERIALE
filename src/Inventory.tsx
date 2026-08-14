@@ -1,21 +1,22 @@
-import { FormEvent, useEffect, useState } from 'react'
-import { canEditItem, canUseItem, formatPhysicalLocation, formatScope, loadItems, loadReferenceData } from './data'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { canEditItem, canUseItem, filterItems, formatPhysicalLocation, formatScope, loadItems, loadReferenceData } from './data'
 import { ItemDetail } from './ItemDetail'
 import { supabase } from './lib/supabase'
 import type { Item, Profile, StorageLocation } from './types'
 
 export function Inventory({ profile, onEditItem }: { profile: Profile; onEditItem: (item: Item) => void }) {
   const [query, setQuery] = useState('')
+  const [appliedQuery, setAppliedQuery] = useState('')
   const [items, setItems] = useState<Item[]>([])
   const [locations, setLocations] = useState<StorageLocation[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function refresh(search = query) {
+  async function refresh() {
     setLoading(true)
     try {
-      const [nextItems, refs] = await Promise.all([loadItems(search), loadReferenceData()])
+      const [nextItems, refs] = await Promise.all([loadItems(), loadReferenceData()])
       setItems(nextItems)
       setLocations(refs.locations)
       setError('')
@@ -26,8 +27,9 @@ export function Inventory({ profile, onEditItem }: { profile: Profile; onEditIte
     }
   }
 
-  useEffect(() => { void refresh('') }, [])
+  useEffect(() => { void refresh() }, [])
 
+  const visibleItems = useMemo(() => filterItems(items, appliedQuery, locations), [items, appliedQuery, locations])
   const selected = selectedId ? items.find((item) => item.id === selectedId) ?? null : null
 
   async function changeQuantity(item: Item, direction: 1 | -1) {
@@ -48,7 +50,7 @@ export function Inventory({ profile, onEditItem }: { profile: Profile; onEditIte
 
   function submitSearch(event: FormEvent) {
     event.preventDefault()
-    void refresh()
+    setAppliedQuery(query)
   }
 
   if (selected) {
@@ -69,7 +71,7 @@ export function Inventory({ profile, onEditItem }: { profile: Profile; onEditIte
       <form className="searchbar" onSubmit={submitSearch}>
         <input
           aria-label="Cerca materiale"
-          placeholder="Cerca materiale, posizione, categoria, note…"
+          placeholder="Cerca materiale, sede, stanza, posizione, branca, categoria…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -77,11 +79,11 @@ export function Inventory({ profile, onEditItem }: { profile: Profile; onEditIte
       </form>
 
       {error && <p className="error panel">{error}</p>}
-      {loading && <p className="muted">Ricerca…</p>}
+      {loading && <p className="muted">Caricamento…</p>}
 
       {!loading && (
         <section className="item-grid">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <article className="item-card clickable" key={item.id} onClick={() => setSelectedId(item.id)}>
               <div className="item-heading">
                 <div>
@@ -104,7 +106,7 @@ export function Inventory({ profile, onEditItem }: { profile: Profile; onEditIte
               )}
             </article>
           ))}
-          {items.length === 0 && <p className="muted">Nessun materiale trovato.</p>}
+          {visibleItems.length === 0 && <p className="muted">Nessun materiale trovato.</p>}
         </section>
       )}
     </main>
