@@ -41,7 +41,7 @@ export function ItemEdit({ item, profile, onDone }: { item: Item; profile: Profi
   function changeBranch(next: string) {
     if (rsLocked) return
     setBranchId(next)
-    setUnitId(refs.units.find((unit) => unit.branch_id === next)?.id ?? '')
+    setUnitId(refs?.units.find((unit) => unit.branch_id === next)?.id ?? '')
     setSquadId('')
   }
 
