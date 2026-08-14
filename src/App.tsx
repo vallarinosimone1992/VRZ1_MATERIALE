@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { AdminPanel } from './AdminPanel'
 import { Inventory } from './Inventory'
+import { ItemEdit } from './ItemEdit'
 import { supabase } from './lib/supabase'
 import type { Item, Profile } from './types'
 
@@ -38,12 +39,17 @@ function Login() {
 }
 
 function Workspace({ profile }: { profile: Profile }) {
-  const [page, setPage] = useState<'inventory' | 'admin'>('inventory')
+  const [page, setPage] = useState<'inventory' | 'admin' | 'edit'>('inventory')
   const [editItem, setEditItem] = useState<Item | null>(null)
 
   function openEdit(item: Item) {
     setEditItem(item)
-    setPage('admin')
+    setPage(profile.role === 'admin' ? 'admin' : 'edit')
+  }
+
+  function backToInventory() {
+    setEditItem(null)
+    setPage('inventory')
   }
 
   return (
@@ -61,13 +67,16 @@ function Workspace({ profile }: { profile: Profile }) {
       </header>
 
       <nav className="mainnav">
-        <button className={page === 'inventory' ? '' : 'secondary'} onClick={() => setPage('inventory')}>Inventario</button>
+        <button className={page === 'inventory' ? '' : 'secondary'} onClick={backToInventory}>Inventario</button>
         {profile.role === 'admin' && <button className={page === 'admin' ? '' : 'secondary'} onClick={() => { setEditItem(null); setPage('admin') }}>Amministrazione</button>}
       </nav>
 
       {page === 'inventory' && <Inventory profile={profile} onEditItem={openEdit} />}
       {page === 'admin' && profile.role === 'admin' && (
         <AdminPanel currentProfile={profile} initialItem={editItem} onInitialItemHandled={() => setEditItem(null)} />
+      )}
+      {page === 'edit' && editItem && (profile.role === 'capo' || profile.role === 'rs') && (
+        <ItemEdit item={editItem} profile={profile} onDone={backToInventory} />
       )}
     </div>
   )
