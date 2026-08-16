@@ -74,7 +74,7 @@ export function canEditItem(profile: Profile, item: Item) {
 }
 
 export function canCreateItem(profile: Profile) {
-  return profile.role === 'admin' || profile.role === 'capo' || profile.role === 'rs'
+  return profile.role === 'admin' || profile.role === 'capo' || profile.role === 'rs' || profile.role === 'eg'
 }
 
 export function locationPath(locationId: string | null, locations: StorageLocation[]) {
