@@ -4,6 +4,7 @@ import { AdminPanel } from './AdminPanel'
 import { Inventory } from './Inventory'
 import { ItemCreate } from './ItemCreate'
 import { ItemEdit } from './ItemEdit'
+import { RegistrationRequests } from './RegistrationRequests'
 import { supabase } from './lib/supabase'
 import type { Item, Profile, RegistrationRequest } from './types'
 
@@ -97,7 +98,7 @@ function Login() {
 }
 
 function Workspace({ profile }: { profile: Profile }) {
-  const [page, setPage] = useState<'inventory' | 'admin' | 'edit' | 'create'>('inventory')
+  const [page, setPage] = useState<'inventory' | 'admin' | 'requests' | 'edit' | 'create'>('inventory')
   const [editItem, setEditItem] = useState<Item | null>(null)
 
   function openEdit(item: Item) {
@@ -127,6 +128,7 @@ function Workspace({ profile }: { profile: Profile }) {
       <nav className="mainnav">
         <button className={page === 'inventory' ? '' : 'secondary'} onClick={backToInventory}>Inventario</button>
         {profile.role === 'admin' && <button className={page === 'admin' ? '' : 'secondary'} onClick={() => { setEditItem(null); setPage('admin') }}>Amministrazione</button>}
+        {profile.role === 'admin' && <button className={page === 'requests' ? '' : 'secondary'} onClick={() => { setEditItem(null); setPage('requests') }}>Richieste accesso</button>}
       </nav>
 
       {page === 'inventory' && <Inventory profile={profile} onEditItem={openEdit} onCreateItem={() => setPage('create')} />}
@@ -136,6 +138,7 @@ function Workspace({ profile }: { profile: Profile }) {
       {page === 'admin' && profile.role === 'admin' && (
         <AdminPanel currentProfile={profile} initialItem={editItem} onInitialItemHandled={() => setEditItem(null)} />
       )}
+      {page === 'requests' && profile.role === 'admin' && <RegistrationRequests />}
       {page === 'edit' && editItem && (profile.role === 'capo' || profile.role === 'rs' || profile.role === 'eg') && (
         <ItemEdit item={editItem} profile={profile} onDone={backToInventory} />
       )}
