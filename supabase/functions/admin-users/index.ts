@@ -37,12 +37,14 @@ Deno.serve(async (req: Request) => {
   const { data: authData, error: authError } = await userClient.auth.getUser();
   if (authError || !authData.user) return json({ error: "Sessione non valida" }, 401);
 
-  const { data: profile, error: profileError } = await serviceClient
+  // Verifica MANAGE usando la stessa sessione e le stesse policy RLS del frontend.
+  const { data: profile, error: profileError } = await userClient
     .from("profiles")
     .select("role, active")
     .eq("id", authData.user.id)
     .single();
-  if (profileError || !profile?.active || profile.role !== "admin") {
+  if (profileError) return json({ error: `Impossibile verificare il profilo Admin: ${profileError.message}` }, 403);
+  if (!profile?.active || profile.role !== "admin") {
     return json({ error: "Permesso MANAGE richiesto" }, 403);
   }
 
