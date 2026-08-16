@@ -10,6 +10,18 @@ export type Profile = {
   active: boolean
 }
 
+export type RegistrationRequest = {
+  id: string
+  user_id: string
+  email: string
+  full_name: string
+  requested_role: Exclude<UserRole, 'admin'>
+  request_note: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+  reviewed_at: string | null
+}
+
 export type Branch = { id: string; label: string; sort_order: number }
 export type Unit = { id: string; branch_id: string; label: string; is_common: boolean; sort_order: number }
 export type Squad = { id: string; unit_id: string; label: string; sort_order: number }
