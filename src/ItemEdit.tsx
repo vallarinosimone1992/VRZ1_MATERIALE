@@ -32,16 +32,19 @@ export function ItemEdit({ item, profile, onDone }: { item: Item; profile: Profi
 
   if (!refs) return <p className="muted">Caricamento editor…</p>
 
+  const allowedBranches = profile.role === 'rs'
+    ? refs.branches.filter((branch) => branch.id === 'comune' || branch.id === 'rs')
+    : refs.branches
   const units = refs.units.filter((unit) => unit.branch_id === branchId)
   const squads = refs.squads.filter((squad) => squad.unit_id === unitId)
   const rooms = refs.rooms.filter((room) => room.site_id === siteId && room.active)
   const locations = refs.locations.filter((entry) => entry.room_id === roomId && entry.active)
-  const rsLocked = profile.role === 'rs'
+  const egLocked = profile.role === 'eg'
 
   function changeBranch(next: string) {
-    if (rsLocked) return
+    if (egLocked) return
     setBranchId(next)
-    setUnitId(refs?.units.find((unit) => unit.branch_id === next)?.id ?? '')
+    setUnitId(refs.units.find((unit) => unit.branch_id === next)?.id ?? '')
     setSquadId('')
   }
 
@@ -67,9 +70,9 @@ export function ItemEdit({ item, profile, onDone }: { item: Item; profile: Profi
           <label>Nome *<input value={name} onChange={(e) => setName(e.target.value)} required /></label>
           <label>Categoria<input value={category} onChange={(e) => setCategory(e.target.value)} /></label>
           <label className="wide">Descrizione<textarea value={description} onChange={(e) => setDescription(e.target.value)} /></label>
-          <label>Branca<select value={branchId} onChange={(e) => changeBranch(e.target.value)} disabled={rsLocked}>{refs.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select></label>
-          <label>Unità<select value={unitId} onChange={(e) => { setUnitId(e.target.value); setSquadId('') }}>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.label}</option>)}</select></label>
-          {branchId === 'eg' && squads.length > 0 && <label>Squadriglia<select value={squadId} onChange={(e) => setSquadId(e.target.value)}><option value="">Comune / nessuna</option>{squads.map((squad) => <option key={squad.id} value={squad.id}>{squad.label}</option>)}</select></label>}
+          <label>Branca<select value={branchId} onChange={(e) => changeBranch(e.target.value)} disabled={egLocked}>{allowedBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select></label>
+          <label>Unità<select value={unitId} onChange={(e) => { setUnitId(e.target.value); setSquadId('') }} disabled={egLocked}>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.label}</option>)}</select></label>
+          {branchId === 'eg' && squads.length > 0 && <label>Squadriglia<select value={squadId} onChange={(e) => setSquadId(e.target.value)} disabled={egLocked}><option value="">Comune / nessuna</option>{squads.map((squad) => <option key={squad.id} value={squad.id}>{squad.label}</option>)}</select></label>}
           <label>Sede<select value={siteId} onChange={(e) => { setSiteId(e.target.value); setRoomId(''); setLocationId('') }}><option value="">Non indicata</option>{refs.sites.filter((site) => site.active).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
           <label>Stanza<select value={roomId} onChange={(e) => { setRoomId(e.target.value); setLocationId('') }}><option value="">Non indicata</option>{rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select></label>
           <label>Posizione<select value={locationId} onChange={(e) => setLocationId(e.target.value)}><option value="">Non indicata</option>{locations.map((entry) => <option key={entry.id} value={entry.id}>{locationPath(entry.id, refs.locations)}</option>)}</select></label>
