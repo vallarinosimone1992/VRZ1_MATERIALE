@@ -5,15 +5,26 @@ import { Inventory } from './Inventory'
 import { ItemCreate } from './ItemCreate'
 import { ItemEdit } from './ItemEdit'
 import { supabase } from './lib/supabase'
-import type { Item, Profile } from './types'
+import type { Item, Profile, RegistrationRequest } from './types'
 
 function Login() {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [requestedRole, setRequestedRole] = useState<'capo' | 'rs' | 'eg'>('capo')
+  const [requestNote, setRequestNote] = useState('')
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function submit(event: FormEvent) {
+  function switchMode(next: 'login' | 'register') {
+    setMode(next)
+    setError('')
+    setMessage('')
+  }
+
+  async function submitLogin(event: FormEvent) {
     event.preventDefault()
     setLoading(true)
     setError('')
@@ -22,18 +33,64 @@ function Login() {
     setLoading(false)
   }
 
+  async function submitRegistration(event: FormEvent) {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
+    setMessage('')
+    const { data, error: authError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: {
+          registration_source: 'self_service',
+          full_name: fullName.trim(),
+          requested_role: requestedRole,
+          request_note: requestNote.trim(),
+        },
+      },
+    })
+    if (authError) {
+      setError(authError.message)
+    } else if (data.session) {
+      setMessage('Richiesta inviata. Il tuo account deve essere approvato da un Admin prima di poter accedere all’inventario.')
+    } else {
+      setMessage('Registrazione ricevuta. Se richiesto, conferma l’email; l’accesso all’inventario resterà comunque in attesa dell’approvazione di un Admin.')
+    }
+    setLoading(false)
+  }
+
   return (
     <main className="centered-page">
       <section className="panel auth-panel">
         <p className="eyebrow">Sedi scout di Ragioneria</p>
         <h1>VRZ1 Materiale</h1>
-        <p className="muted">Accedi per cercare e utilizzare il materiale.</p>
-        <form onSubmit={submit} className="stack">
-          <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
-          <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
-          {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={loading}>{loading ? 'Accesso…' : 'Accedi'}</button>
-        </form>
+        <div className="subnav auth-tabs">
+          <button type="button" className={mode === 'login' ? '' : 'secondary'} onClick={() => switchMode('login')}>Accedi</button>
+          <button type="button" className={mode === 'register' ? '' : 'secondary'} onClick={() => switchMode('register')}>Richiedi accesso</button>
+        </div>
+
+        {mode === 'login' ? (
+          <form onSubmit={submitLogin} className="stack">
+            <p className="muted">Accedi con il tuo account già approvato.</p>
+            <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+            <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+            {error && <p className="error">{error}</p>}
+            <button type="submit" disabled={loading}>{loading ? 'Accesso…' : 'Accedi'}</button>
+          </form>
+        ) : (
+          <form onSubmit={submitRegistration} className="stack">
+            <p className="muted">Scegli la tua password. Un Admin dovrà approvare la richiesta prima che tu possa usare l’inventario.</p>
+            <label>Nome e cognome<input value={fullName} onChange={(e) => setFullName(e.target.value)} required /></label>
+            <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+            <label>Password<input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required /><span className="field-help">Almeno 8 caratteri.</span></label>
+            <label>Ruolo richiesto<select value={requestedRole} onChange={(e) => setRequestedRole(e.target.value as 'capo' | 'rs' | 'eg')}><option value="capo">Capo</option><option value="rs">R/S</option><option value="eg">E/G</option></select></label>
+            <label>Unità / squadriglia (opzionale)<input value={requestNote} onChange={(e) => setRequestNote(e.target.value)} placeholder="es. Reparto Mulino, Cobra" /></label>
+            {error && <p className="error">{error}</p>}
+            {message && <p className="success">{message}</p>}
+            <button type="submit" disabled={loading || Boolean(message)}>{loading ? 'Invio…' : 'Invia richiesta'}</button>
+          </form>
+        )}
       </section>
     </main>
   )
@@ -89,6 +146,7 @@ function Workspace({ profile }: { profile: Profile }) {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [registration, setRegistration] = useState<RegistrationRequest | null>(null)
   const [loading, setLoading] = useState(true)
   const [profileError, setProfileError] = useState('')
 
@@ -102,6 +160,7 @@ export default function App() {
     async function loadProfile() {
       if (!session?.user) {
         setProfile(null)
+        setRegistration(null)
         setLoading(false)
         return
       }
@@ -110,13 +169,21 @@ export default function App() {
         .from('profiles')
         .select('id, email, full_name, role, unit_id, squad_id, active')
         .eq('id', session.user.id)
-        .single()
-      if (error || !data?.active) {
-        setProfile(null)
-        setProfileError('Account autenticato ma non ancora abilitato nell’inventario. Contatta l’amministratore.')
-      } else {
+        .maybeSingle()
+      if (data?.active) {
         setProfile(data as Profile)
+        setRegistration(null)
         setProfileError('')
+      } else {
+        setProfile(null)
+        const { data: request } = await supabase
+          .from('registration_requests')
+          .select('id, user_id, email, full_name, requested_role, request_note, status, created_at, reviewed_at')
+          .eq('user_id', session.user.id)
+          .maybeSingle()
+        setRegistration((request as RegistrationRequest | null) ?? null)
+        if (error && error.code !== 'PGRST116') setProfileError(error.message)
+        else setProfileError('Account autenticato ma non abilitato nell’inventario.')
       }
       setLoading(false)
     }
@@ -126,7 +193,9 @@ export default function App() {
   if (loading) return <main className="centered-page"><p>Caricamento…</p></main>
   if (!session) return <Login />
   if (!profile) {
-    return <main className="centered-page"><section className="panel"><h1>Account non abilitato</h1><p>{profileError}</p><button onClick={() => void supabase.auth.signOut()}>Esci</button></section></main>
+    const pending = registration?.status === 'pending'
+    const rejected = registration?.status === 'rejected'
+    return <main className="centered-page"><section className="panel auth-panel"><h1>{pending ? 'Richiesta in attesa' : rejected ? 'Richiesta non approvata' : 'Account non abilitato'}</h1><p>{pending ? 'La registrazione è stata ricevuta. Un Admin deve ancora approvare il tuo account e assegnare i permessi.' : rejected ? 'La richiesta di accesso non è stata approvata. Contatta un Admin se pensi che sia un errore.' : profileError}</p><button onClick={() => void supabase.auth.signOut()}>Esci</button></section></main>
   }
   return <Workspace profile={profile} />
 }
