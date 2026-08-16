@@ -69,7 +69,12 @@ export function canUseItem(profile: Profile, item: Item) {
 
 export function canEditItem(profile: Profile, item: Item) {
   if (profile.role === 'admin' || profile.role === 'capo') return true
-  return profile.role === 'rs' && item.branch_id === 'rs'
+  if (profile.role === 'rs') return item.branch_id === 'rs' || item.branch_id === 'comune'
+  return profile.role === 'eg' && item.branch_id === 'eg' && !!profile.squad_id && item.squad_id === profile.squad_id
+}
+
+export function canCreateItem(profile: Profile) {
+  return profile.role === 'admin' || profile.role === 'capo' || profile.role === 'rs'
 }
 
 export function locationPath(locationId: string | null, locations: StorageLocation[]) {
