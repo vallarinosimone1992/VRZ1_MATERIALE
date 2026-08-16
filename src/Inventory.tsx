@@ -1,10 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { canEditItem, canUseItem, filterItems, formatPhysicalLocation, formatScope, loadItems, loadReferenceData } from './data'
+import { canCreateItem, canEditItem, canUseItem, filterItems, formatPhysicalLocation, formatScope, loadItems, loadReferenceData } from './data'
 import { ItemDetail } from './ItemDetail'
 import { supabase } from './lib/supabase'
 import type { Item, Profile, StorageLocation } from './types'
 
-export function Inventory({ profile, onEditItem }: { profile: Profile; onEditItem: (item: Item) => void }) {
+export function Inventory({ profile, onEditItem, onCreateItem }: { profile: Profile; onEditItem: (item: Item) => void; onCreateItem: () => void }) {
   const [query, setQuery] = useState('')
   const [appliedQuery, setAppliedQuery] = useState('')
   const [items, setItems] = useState<Item[]>([])
@@ -68,6 +68,11 @@ export function Inventory({ profile, onEditItem }: { profile: Profile; onEditIte
 
   return (
     <main>
+      <div className="section-heading inventory-heading">
+        <div><p className="eyebrow">Inventario</p><h2>Materiale disponibile</h2></div>
+        {canCreateItem(profile) && <button onClick={onCreateItem}>+ Nuovo materiale</button>}
+      </div>
+
       <form className="searchbar" onSubmit={submitSearch}>
         <input
           aria-label="Cerca materiale"
