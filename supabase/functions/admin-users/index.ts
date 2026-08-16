@@ -19,34 +19,32 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Metodo non consentito" }, 405);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const authorization = req.headers.get("Authorization");
-  if (!supabaseUrl || !anonKey || !serviceRoleKey || !authorization) {
+  const accessToken = authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
+
+  if (!supabaseUrl || !serviceRoleKey) {
     return json({ error: "Configurazione server incompleta" }, 500);
   }
+  if (!accessToken) return json({ error: "Autenticazione richiesta" }, 401);
 
-  const userClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authorization } },
-    auth: { persistSession: false },
-  });
   const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: authData, error: authError } = await userClient.auth.getUser();
-  if (authError || !authData.user) return json({ error: "Sessione non valida" }, 401);
+  const { data: authData, error: authError } = await serviceClient.auth.getUser(accessToken);
+  if (authError || !authData.user) {
+    return json({ error: `Sessione non valida${authError?.message ? `: ${authError.message}` : ""}` }, 401);
+  }
 
-  // Verifica MANAGE usando la stessa sessione e le stesse policy RLS del frontend.
-  const { data: profile, error: profileError } = await userClient
+  const { data: profile, error: profileError } = await serviceClient
     .from("profiles")
     .select("role, active")
     .eq("id", authData.user.id)
     .single();
+
   if (profileError) return json({ error: `Impossibile verificare il profilo Admin: ${profileError.message}` }, 403);
-  if (!profile?.active || profile.role !== "admin") {
-    return json({ error: "Permesso MANAGE richiesto" }, 403);
-  }
+  if (!profile?.active || profile.role !== "admin") return json({ error: "Permesso MANAGE richiesto" }, 403);
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Corpo richiesta non valido" }, 400); }
