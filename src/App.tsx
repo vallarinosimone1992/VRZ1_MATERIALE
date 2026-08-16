@@ -73,7 +73,7 @@ function Workspace({ profile }: { profile: Profile }) {
       </nav>
 
       {page === 'inventory' && <Inventory profile={profile} onEditItem={openEdit} onCreateItem={() => setPage('create')} />}
-      {page === 'create' && (profile.role === 'admin' || profile.role === 'capo' || profile.role === 'rs') && (
+      {page === 'create' && (profile.role === 'admin' || profile.role === 'capo' || profile.role === 'rs' || profile.role === 'eg') && (
         <ItemCreate profile={profile} onDone={backToInventory} />
       )}
       {page === 'admin' && profile.role === 'admin' && (
