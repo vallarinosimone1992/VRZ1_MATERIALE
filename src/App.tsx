@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { AdminPanel } from './AdminPanel'
 import { BugReport } from './BugReport'
+import { BugReportsAdmin } from './BugReportsAdmin'
 import { Inventory } from './Inventory'
 import { ItemCreate } from './ItemCreate'
 import { ItemEdit } from './ItemEdit'
@@ -99,7 +100,7 @@ function Login() {
 }
 
 function Workspace({ profile }: { profile: Profile }) {
-  const [page, setPage] = useState<'inventory' | 'admin' | 'requests' | 'bug' | 'edit' | 'create'>('inventory')
+  const [page, setPage] = useState<'inventory' | 'admin' | 'requests' | 'bug' | 'bug-admin' | 'edit' | 'create'>('inventory')
   const [editItem, setEditItem] = useState<Item | null>(null)
 
   function openEdit(item: Item) {
@@ -130,6 +131,7 @@ function Workspace({ profile }: { profile: Profile }) {
         <button className={page === 'inventory' ? '' : 'secondary'} onClick={backToInventory}>Inventario</button>
         {profile.role === 'admin' && <button className={page === 'admin' ? '' : 'secondary'} onClick={() => { setEditItem(null); setPage('admin') }}>Amministrazione</button>}
         {profile.role === 'admin' && <button className={page === 'requests' ? '' : 'secondary'} onClick={() => { setEditItem(null); setPage('requests') }}>Richieste accesso</button>}
+        {profile.role === 'admin' && <button className={page === 'bug-admin' ? '' : 'secondary'} onClick={() => { setEditItem(null); setPage('bug-admin') }}>Segnalazioni bug</button>}
         <button className={page === 'bug' ? '' : 'secondary'} onClick={() => { setEditItem(null); setPage('bug') }}>Segnala bug</button>
       </nav>
 
@@ -141,7 +143,8 @@ function Workspace({ profile }: { profile: Profile }) {
         <AdminPanel currentProfile={profile} initialItem={editItem} onInitialItemHandled={() => setEditItem(null)} />
       )}
       {page === 'requests' && profile.role === 'admin' && <RegistrationRequests />}
-      {page === 'bug' && <BugReport profile={profile} onDone={backToInventory} />}
+      {page === 'bug-admin' && profile.role === 'admin' && <BugReportsAdmin />}
+      {page === 'bug' && <BugReport onDone={backToInventory} />}
       {page === 'edit' && editItem && (profile.role === 'capo' || profile.role === 'rs' || profile.role === 'eg') && (
         <ItemEdit item={editItem} profile={profile} onDone={backToInventory} />
       )}
