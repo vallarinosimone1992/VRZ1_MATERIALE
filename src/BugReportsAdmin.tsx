@@ -12,19 +12,27 @@ type BugReportRow = {
   closed_at: string | null
 }
 
+type Reporter = { id: string; full_name: string; email: string | null }
+
 export function BugReportsAdmin() {
   const [reports, setReports] = useState<BugReportRow[]>([])
+  const [reporters, setReporters] = useState<Record<string, Reporter>>({})
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
   async function loadReports() {
     setLoading(true)
-    const { data, error: queryError } = await supabase
-      .from('bug_reports')
-      .select('id, reporter_id, description, page, user_agent, status, created_at, closed_at')
-      .order('created_at', { ascending: false })
+    const [reportResult, profileResult] = await Promise.all([
+      supabase.from('bug_reports').select('id, reporter_id, description, page, user_agent, status, created_at, closed_at').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, full_name, email'),
+    ])
+    const queryError = reportResult.error || profileResult.error
     if (queryError) setError(queryError.message)
-    else { setReports((data ?? []) as BugReportRow[]); setError('') }
+    else {
+      setReports((reportResult.data ?? []) as BugReportRow[])
+      setReporters(Object.fromEntries(((profileResult.data ?? []) as Reporter[]).map((profile) => [profile.id, profile])))
+      setError('')
+    }
     setLoading(false)
   }
 
@@ -46,18 +54,22 @@ export function BugReportsAdmin() {
         {error && <p className="error">{error}</p>}
         {loading && <p className="muted">Caricamento…</p>}
         {!loading && <div className="admin-list">
-          {reports.map((report) => (
-            <article className="admin-row" key={report.id}>
-              <div>
-                <strong>{report.status === 'open' ? 'Aperta' : 'Chiusa'} · {new Date(report.created_at).toLocaleString('it-IT')}</strong>
-                <span>{report.description}</span>
-                {report.page && <span>Pagina: {report.page}</span>}
-              </div>
-              <button className="secondary" onClick={() => void setStatus(report, report.status === 'open' ? 'closed' : 'open')}>
-                {report.status === 'open' ? 'Segna risolta' : 'Riapri'}
-              </button>
-            </article>
-          ))}
+          {reports.map((report) => {
+            const reporter = reporters[report.reporter_id]
+            return (
+              <article className="admin-row" key={report.id}>
+                <div>
+                  <strong>{report.status === 'open' ? 'Aperta' : 'Chiusa'} · {new Date(report.created_at).toLocaleString('it-IT')}</strong>
+                  <span>{reporter ? `${reporter.full_name}${reporter.email ? ` · ${reporter.email}` : ''}` : `Utente ${report.reporter_id}`}</span>
+                  <span>{report.description}</span>
+                  {report.page && <span>Pagina: {report.page}</span>}
+                </div>
+                <button className="secondary" onClick={() => void setStatus(report, report.status === 'open' ? 'closed' : 'open')}>
+                  {report.status === 'open' ? 'Segna risolta' : 'Riapri'}
+                </button>
+              </article>
+            )
+          })}
           {reports.length === 0 && <p className="muted">Nessuna segnalazione.</p>}
         </div>}
       </section>
