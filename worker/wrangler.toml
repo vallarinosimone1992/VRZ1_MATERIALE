@@ -9,5 +9,5 @@ FRONTEND_ORIGIN = "http://localhost:5173"
 [[d1_databases]]
 binding = "DB"
 database_name = "vrz1-materiale-v2"
-database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
+database_id = "63d82404-4ac4-43d5-97b2-353fcb7c8497"
 migrations_dir = "migrations"
