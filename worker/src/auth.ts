@@ -77,5 +77,5 @@ export async function hashToken(token: string) {
 
 export function createSessionToken() {
   return bytesToBase64(crypto.getRandomValues(new Uint8Array(32)))
-    .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
