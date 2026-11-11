@@ -221,6 +221,94 @@ async function logout(request: Request, env: Env, origin: string | null) {
   return json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } }, origin, env)
 }
 
+
+type ReviewBody = {
+  action?: unknown
+  unit_id?: unknown
+  squad_id?: unknown
+}
+
+async function adminRegistrations(request: Request, env: Env, origin: string | null) {
+  const user = await authenticatedUser(request, env)
+  if (!user) return json({ error: 'Non autenticato.' }, { status: 401 }, origin, env)
+  if (user.role !== 'admin') return json({ error: 'Accesso riservato agli amministratori.' }, { status: 403 }, origin, env)
+
+  if (request.method === 'GET') {
+    const result = await env.DB.prepare(
+      `SELECT id, user_id, email, full_name, requested_role, request_note, status, created_at
+       FROM registration_requests WHERE status = 'pending' ORDER BY created_at ASC`,
+    ).all()
+    return json({ requests: result.results }, { headers: { 'Cache-Control': 'no-store' } }, origin, env)
+  }
+
+  let body: ReviewBody
+  try {
+    body = await request.json<ReviewBody>()
+  } catch {
+    return json({ error: 'JSON non valido.' }, { status: 400 }, origin, env)
+  }
+  if (body.action !== 'approve' && body.action !== 'reject') {
+    return json({ error: 'Azione non valida.' }, { status: 400 }, origin, env)
+  }
+  const path = new URL(request.url).pathname
+  const match = /^\/api\/v2\/admin\/registrations\/([0-9a-f-]{36})\/review$/.exec(path)
+  if (!match) return json({ error: 'Not found' }, { status: 404 }, origin, env)
+
+  const pending = await env.DB.prepare(
+    "SELECT id, user_id, requested_role FROM registration_requests WHERE id = ? AND status = 'pending'",
+  ).bind(match[1]).first<{ id: string; user_id: string; requested_role: string }>()
+  if (!pending) return json({ error: 'Richiesta non trovata o già esaminata.' }, { status: 404 }, origin, env)
+
+  let unitId: string | null = null
+  let squadId: string | null = null
+  if (body.action === 'approve') {
+    unitId = typeof body.unit_id === 'string' ? body.unit_id : null
+    squadId = typeof body.squad_id === 'string' ? body.squad_id : null
+    if (pending.requested_role === 'eg') {
+      if (!squadId || !unitId) {
+        return json({ error: 'Per E/G servono unit_id e squad_id.' }, { status: 400 }, origin, env)
+      }
+      const squad = await env.DB.prepare(
+        `SELECT s.id FROM squads s JOIN units u ON u.id = s.unit_id
+         WHERE s.id = ? AND s.unit_id = ? AND u.branch_id = 'eg'`,
+      ).bind(squadId, unitId).first()
+      if (!squad) return json({ error: 'Squadriglia o reparto non valido.' }, { status: 400 }, origin, env)
+    } else {
+      if (squadId) return json({ error: 'La squadriglia è riservata a E/G.' }, { status: 400 }, origin, env)
+      if (unitId) {
+        const unit = await env.DB.prepare('SELECT id FROM units WHERE id = ?')
+          .bind(unitId).first()
+        if (!unit) return json({ error: 'Unità non valida.' }, { status: 400 }, origin, env)
+      }
+    }
+  }
+
+  // Conditional writes make a concurrent second review fail and roll back the batch.
+  try {
+    const statements: D1PreparedStatement[] = []
+    if (body.action === 'approve') {
+      statements.push(env.DB.prepare(
+        `INSERT INTO profiles (id, role, unit_id, squad_id, active)
+         SELECT user_id, requested_role, ?, ?, 1
+         FROM registration_requests WHERE id = ? AND status = 'pending'`,
+      ).bind(unitId, squadId, pending.id))
+    }
+    statements.push(env.DB.prepare(
+      `UPDATE registration_requests SET status = ?, reviewed_at = datetime('now'), reviewed_by = ?
+       WHERE id = ? AND status = 'pending'`,
+    ).bind(body.action === 'approve' ? 'approved' : 'rejected', user.id, pending.id))
+    const result = await env.DB.batch(statements)
+    if (result[result.length - 1].meta.changes !== 1) {
+      return json({ error: 'Richiesta già esaminata.' }, { status: 409 }, origin, env)
+    }
+  } catch (error) {
+    console.error('Registration review failed', error)
+    return json({ error: 'Impossibile esaminare la richiesta.' }, { status: 409 }, origin, env)
+  }
+  return json({ ok: true, status: body.action === 'approve' ? 'approved' : 'rejected' },
+    { headers: { 'Cache-Control': 'no-store' } }, origin, env)
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -261,6 +349,13 @@ export default {
       return user
         ? json({ user }, { headers: { 'Cache-Control': 'no-store' } }, origin, env)
         : json({ error: 'Non autenticato.' }, { status: 401 }, origin, env)
+    }
+
+    if (url.pathname === '/api/v2/admin/registrations' && request.method === 'GET') {
+      return adminRegistrations(request, env, origin)
+    }
+    if (/^\\/api\\/v2\\/admin\\/registrations\\/[0-9a-f-]{36}\\/review$/.test(url.pathname) && request.method === 'POST') {
+      return adminRegistrations(request, env, origin)
     }
 
     return json({ error: 'Not found' }, { status: 404 }, origin, env)
