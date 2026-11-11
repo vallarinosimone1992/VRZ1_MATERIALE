@@ -70,3 +70,36 @@ La matrice resta invariata:
 ## Note Cloudflare Free
 
 Workers Free prevede 100.000 richieste/giorno. D1 Free prevede 500 MB per database, 5 GB totali, 5 milioni di righe lette/giorno e 100.000 righe scritte/giorno. Questi limiti sono ampi per il carico previsto, ma le query dovranno essere indicizzate e monitorate.
+
+
+## Primo amministratore (bootstrap manuale)
+
+Non esiste un endpoint HTTP pubblico per creare amministratori. Il primo Admin
+deve essere promosso una sola volta tramite accesso amministrativo a D1 con
+Wrangler, dopo essersi registrato con un indirizzo email reale.
+
+Verificare prima che l'account sia quello corretto:
+
+```bash
+npx wrangler d1 execute vrz1-materiale-v2 --remote --command "SELECT id, email FROM accounts WHERE email = 'EMAIL_ADMIN';"
+```
+
+Poi eseguire (sostituendo EMAIL_ADMIN con l'indirizzo verificato):
+
+```bash
+npx wrangler d1 execute vrz1-materiale-v2 --remote --command "INSERT INTO profiles (id, role, active) SELECT id, 'admin', 1 FROM accounts WHERE email = 'EMAIL_ADMIN' AND NOT EXISTS (SELECT 1 FROM profiles WHERE profiles.id = accounts.id); UPDATE registration_requests SET status = 'approved', reviewed_at = datetime('now') WHERE email = 'EMAIL_ADMIN' AND status = 'pending';"
+```
+
+Verificare che sia stato creato **esattamente un** profilo admin. Non usare
+account fittizi o password condivise per il bootstrap. L'accesso a D1 tramite
+Wrangler richiede le credenziali Cloudflare dell'operatore.
+
+## API di approvazione (solo Admin)
+
+- `GET /api/v2/admin/registrations`: richieste pending.
+- `POST /api/v2/admin/registrations/:id/review` con
+  `{"action":"approve","unit_id":"...","squad_id":"..."}` oppure
+  `{"action":"reject"}`.
+- Richiedono `Authorization: Bearer <token>` di un account Admin attivo.
+- Per E/G unità e squadriglia sono obbligatorie e devono essere coerenti.
+- L'approvazione crea il profilo; la richiesta viene marcata come esaminata.
