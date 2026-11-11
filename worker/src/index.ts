@@ -354,7 +354,7 @@ export default {
     if (url.pathname === '/api/v2/admin/registrations' && request.method === 'GET') {
       return adminRegistrations(request, env, origin)
     }
-    if (/^\\/api\\/v2\\/admin\\/registrations\\/[0-9a-f-]{36}\\/review$/.test(url.pathname) && request.method === 'POST') {
+    if (/^\/api\/v2\/admin\/registrations\/[0-9a-f-]{36}\/review$/.test(url.pathname) && request.method === 'POST') {
       return adminRegistrations(request, env, origin)
     }
 
