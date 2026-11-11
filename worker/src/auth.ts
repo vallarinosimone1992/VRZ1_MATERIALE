@@ -1,6 +1,7 @@
 export type RequestedRole = 'capo' | 'rs' | 'eg'
 
-const PASSWORD_ITERATIONS = 210_000
+// Cloudflare Workers WebCrypto currently limits PBKDF2 to 100,000 iterations.
+const PASSWORD_ITERATIONS = 100_000
 const encoder = new TextEncoder()
 
 function bytesToBase64(bytes: Uint8Array) {
